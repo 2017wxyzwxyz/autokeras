@@ -113,7 +113,7 @@ class GreedyOracle(kerastuner.Oracle):
         self._tried_initial_hps = state["tried_initial_hps"]
 
     def _select_hps(self):
-        # TODO: consider condition_scopes.
+        # TODO: consider condition_scopes. Only select from active hps.
         trie = Trie()
         for hp in self.hyperparameters.space:
             trie.insert(hp)
@@ -122,6 +122,7 @@ class GreedyOracle(kerastuner.Oracle):
         if len(all_nodes) <= 1:
             return []
 
+        best_hps = self._get_best_hps()
         probabilities = np.array([1 / node.num_leaves for node in all_nodes])
         sum_p = np.sum(probabilities)
         probabilities = probabilities / sum_p
@@ -160,12 +161,15 @@ class GreedyOracle(kerastuner.Oracle):
             "values": None,
         }
 
-    def _generate_hp_values(self, hp_list):
+    def _get_best_hps(self):
         best_trials = self.get_best_trials()
         if best_trials:
-            best_hps = best_trials[0].hyperparameters
+            return best_trials[0].hyperparameters
         else:
-            best_hps = self.hyperparameters
+            return self.hyperparameters
+
+    def _generate_hp_values(self, hp_list):
+        best_hps = self._get_best_hps()
 
         collisions = 0
         while True:
@@ -173,6 +177,11 @@ class GreedyOracle(kerastuner.Oracle):
             # Generate a set of random values.
             for hp in hp_list:
                 # TODO: Check is_active for hp.
+                # iterate all hps, 
+                # if active to active. check if selected.f
+                # if active to not active. do nothing.
+                # if not active to active. sample.
+                # if not active to not active. do nothing.
                 hps.values[hp.name] = hp.random_sample(self._seed_state)
                 self._seed_state += 1
             values = hps.values
