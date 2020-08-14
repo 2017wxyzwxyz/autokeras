@@ -25,7 +25,7 @@ class TrieNode(object):
         super().__init__()
         self.num_leaves = 0
         self.children = {}
-        self.hp = None
+        self.hp_name = None
 
     def is_leaf(self):
         return len(self.children) == 0
@@ -36,10 +36,8 @@ class Trie(object):
         super().__init__()
         self.root = TrieNode()
 
-    def insert(self, hp):
-        name = hp.name
-        long_name = name
-        names = long_name.split("/")
+    def insert(self, hp_name):
+        names = hp_name.split("/")
 
         new_word = False
         current_node = self.root
@@ -50,7 +48,7 @@ class Trie(object):
                 new_word = True
             current_node = current_node.children[name]
             nodes_on_path.append(current_node)
-        current_node.hp = hp
+        current_node.hp_name = hp_name
 
         if new_word:
             for node in nodes_on_path:
@@ -66,12 +64,12 @@ class Trie(object):
             ret += self._get_all_nodes(value)
         return ret
 
-    def get_hps(self, node):
+    def get_hp_names(self, node):
         if node.is_leaf():
-            return [node.hp]
+            return [node.hp_name]
         ret = []
         for key, value in node.children.items():
-            ret += self.get_hps(value)
+            ret += self.get_hp_names(value)
         return ret
 
 
@@ -113,22 +111,22 @@ class GreedyOracle(kerastuner.Oracle):
         self._tried_initial_hps = state["tried_initial_hps"]
 
     def _select_hps(self):
-        # TODO: consider condition_scopes. Only select from active hps.
         trie = Trie()
-        for hp in self.hyperparameters.space:
-            trie.insert(hp)
+        best_hps = self._get_best_hps()
+        for hp in best_hps.space:
+            if best_hps.is_active(hp):
+                trie.insert(hp.name)
         all_nodes = trie.nodes
 
         if len(all_nodes) <= 1:
             return []
 
-        best_hps = self._get_best_hps()
         probabilities = np.array([1 / node.num_leaves for node in all_nodes])
         sum_p = np.sum(probabilities)
         probabilities = probabilities / sum_p
         node = np.random.choice(all_nodes, p=probabilities)
 
-        return trie.get_hps(node)
+        return trie.get_hp_names(node)
 
     def _next_initial_hps(self):
         for index, hps in enumerate(self.initial_hps):
